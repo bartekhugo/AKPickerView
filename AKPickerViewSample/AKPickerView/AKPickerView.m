@@ -15,46 +15,67 @@
 @end
 
 @interface AKCollectionViewLayout : UICollectionViewFlowLayout
+
 @end
 
 @interface AKPickerView () <UICollectionViewDataSource, UICollectionViewDelegateFlowLayout>
+
 @property (nonatomic, strong) UICollectionView *collectionView;
 @property (nonatomic, assign) NSUInteger selectedItem;
+
 - (CGFloat)offsetForItem:(NSUInteger)item;
 - (void)didEndScrolling;
+
 @end
 
 @implementation AKPickerView
 
 - (void)initialize
 {
-	self.font = self.font ?: [UIFont fontWithName:@"HelveticaNeue-Light" size:20];
-	self.textColor = self.textColor ?: [UIColor darkGrayColor];
-	self.highlightedTextColor = self.highlightedTextColor ?: [UIColor blackColor];
+    self.font                 = [UIFont fontWithName:@"HelveticaNeue-Light" size:20];
+    self.textColor            = [UIColor darkGrayColor];
+    self.highlightedTextColor = [UIColor blackColor];
+    
+    [self setupCollectionView];
+    
+    [self setupGradientOverlay];
+}
 
-	[self.collectionView removeFromSuperview];
-	self.collectionView = [[UICollectionView alloc] initWithFrame:self.bounds
-											 collectionViewLayout:[AKCollectionViewLayout new]];
-	self.collectionView.showsHorizontalScrollIndicator = NO;
-	self.collectionView.backgroundColor = [UIColor clearColor];
-	self.collectionView.decelerationRate = UIScrollViewDecelerationRateFast;
-	self.collectionView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-	self.collectionView.delegate = self;
-	self.collectionView.dataSource = self;
-	[self.collectionView registerClass:[AKCollectionViewCell class]
-			forCellWithReuseIdentifier:NSStringFromClass([AKCollectionViewCell class])];
-	[self addSubview:self.collectionView];
+- (void)setupCollectionView
+{
+    UICollectionView *collectionView = [[UICollectionView alloc] initWithFrame:self.bounds
+                                                          collectionViewLayout:[AKCollectionViewLayout new]];
+	
+    collectionView.translatesAutoresizingMaskIntoConstraints = YES;
+    collectionView.showsHorizontalScrollIndicator = NO;
+    collectionView.backgroundColor  = [UIColor clearColor];
+    collectionView.decelerationRate = UIScrollViewDecelerationRateFast;
+    collectionView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    collectionView.delegate         = self;
+    collectionView.dataSource       = self;
+    
+    [collectionView registerClass:[AKCollectionViewCell class]
+       forCellWithReuseIdentifier:NSStringFromClass([AKCollectionViewCell class])];
+    
+	[self addSubview:collectionView];
+    
+    self.collectionView = collectionView;
+    
+}
 
+- (void)setupGradientOverlay
+{
 	CAGradientLayer *maskLayer = [CAGradientLayer layer];
 	maskLayer.frame = self.collectionView.bounds;
 	maskLayer.colors = @[(id)[[UIColor clearColor] CGColor],
 						 (id)[[UIColor blackColor] CGColor],
 						 (id)[[UIColor blackColor] CGColor],
 						 (id)[[UIColor clearColor] CGColor],];
-	maskLayer.locations = @[@0.0, @0.33, @0.66, @1.0];
+	maskLayer.locations = @[@0.0, @0.4, @0.6, @1.0];
 	maskLayer.startPoint = CGPointMake(0.0, 0.0);
 	maskLayer.endPoint = CGPointMake(1.0, 0.0);
-	self.collectionView.layer.mask = maskLayer;
+    
+	self.layer.mask = maskLayer;
 }
 
 - (id)initWithFrame:(CGRect)frame
@@ -81,8 +102,8 @@
 {
 	[super layoutSubviews];
 	[self.collectionView.collectionViewLayout invalidateLayout];
-	[self scrollToItem:self.selectedItem animated:NO];
-	self.collectionView.layer.mask.frame = self.collectionView.bounds;
+    [self scrollToItem:self.selectedItem animated:YES];
+	self.layer.mask.frame = self.collectionView.bounds;
 }
 
 #pragma mark -
@@ -91,7 +112,7 @@
 {
 	if (![_font isEqual:font]) {
 		_font = font;
-		[self initialize];
+		[self.collectionView reloadData];
 	}
 }
 
@@ -110,13 +131,13 @@
 		AKCollectionViewCell *cell = (AKCollectionViewCell *)[self.collectionView cellForItemAtIndexPath:_indexPath];
 		offset += cell.bounds.size.width;
 	}
-
+    
 	NSIndexPath *firstIndexPath = [NSIndexPath indexPathForItem:0 inSection:0];
 	CGSize firstSize = [self.collectionView cellForItemAtIndexPath:firstIndexPath].bounds.size;
 	NSIndexPath *selectedIndexPath = [NSIndexPath indexPathForItem:item inSection:0];
 	CGSize selectedSize = [self.collectionView cellForItemAtIndexPath:selectedIndexPath].bounds.size;
 	offset -= (firstSize.width - selectedSize.width) / 2;
-
+    
 	offset += self.interitemSpacing * item;
 	return offset;
 }
@@ -134,9 +155,9 @@
 									  animated:animated
 								scrollPosition:UICollectionViewScrollPositionNone];
 	[self scrollToItem:item animated:animated];
-
+    
 	self.selectedItem = item;
-
+    
 	if ([self.delegate respondsToSelector:@selector(pickerView:didSelectItem:)])
 		[self.delegate pickerView:self didSelectItem:item];
 }
@@ -170,7 +191,7 @@
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath
 {
 	NSString *title = [self.delegate pickerView:self titleForItem:indexPath.item];
-
+    
 	AKCollectionViewCell *cell = [collectionView dequeueReusableCellWithReuseIdentifier:NSStringFromClass([AKCollectionViewCell class])
 																		   forIndexPath:indexPath];
 	cell.label.textColor = self.textColor;
@@ -182,9 +203,9 @@
 	} else {
 		cell.label.text = title;
 	}
-
+    
 	[cell.label sizeToFit];
-
+    
 	return cell;
 }
 
@@ -233,30 +254,29 @@
 	if (!decelerate) [self didEndScrolling];
 }
 
-- (void)scrollViewDidScroll:(UIScrollView *)scrollView
-{
-	[CATransaction begin];
-	[CATransaction setValue:(id)kCFBooleanTrue
-					 forKey:kCATransactionDisableActions];
-	self.collectionView.layer.mask.frame = self.collectionView.bounds;
-	[CATransaction commit];
-}
-
 @end
 
 @implementation AKCollectionViewCell
 
 - (void)initialize
 {
-	self.label = [[UILabel alloc] initWithFrame:self.bounds];
-	self.label.backgroundColor = [UIColor clearColor];
-	self.label.textAlignment = NSTextAlignmentCenter;
-	self.label.textColor = [UIColor grayColor];
-	self.label.numberOfLines = 1;
-	self.label.lineBreakMode = NSLineBreakByTruncatingTail;
-	self.label.highlightedTextColor = [UIColor blackColor];
-	self.label.font = [UIFont systemFontOfSize:[UIFont systemFontSize]];
-	[self.contentView addSubview:self.label];
+    [self setupLabel];
+}
+
+- (void)setupLabel
+{
+	UILabel *label = [[UILabel alloc] initWithFrame:self.bounds];
+	label.backgroundColor = [UIColor clearColor];
+	label.textAlignment = NSTextAlignmentCenter;
+	label.textColor = [UIColor grayColor];
+	label.numberOfLines = 1;
+	label.lineBreakMode = NSLineBreakByTruncatingTail;
+	label.highlightedTextColor = [UIColor blackColor];
+	label.font = [UIFont systemFontOfSize:[UIFont systemFontSize]];
+	[self.contentView addSubview:label];
+    
+    self.label = label;
+    
 }
 
 - (id)initWithFrame:(CGRect)frame
@@ -280,9 +300,11 @@
 @end
 
 @interface AKCollectionViewLayout ()
+
 @property (nonatomic, assign) CGFloat width;
 @property (nonatomic, assign) CGFloat midX;
 @property (nonatomic, assign) CGFloat maxAngle;
+
 @end
 
 @implementation AKCollectionViewLayout
@@ -290,10 +312,10 @@
 - (id)init
 {
 	self = [super init];
-	if (self) {
-		self.sectionInset = UIEdgeInsetsMake(0.0, 0.0, 0.0, 0.0);
+	if (self)
+    {
 		self.scrollDirection = UICollectionViewScrollDirectionHorizontal;
-		self.minimumLineSpacing = 0.0;
+        self.minimumLineSpacing = 100;
 	}
 	return self;
 }
@@ -314,16 +336,14 @@
 - (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath
 {
 	UICollectionViewLayoutAttributes *attributes = [super layoutAttributesForItemAtIndexPath:indexPath];
-
+    
 	CGFloat distance = CGRectGetMidX(attributes.frame) - self.midX;
-	CGFloat currentAngle = self.maxAngle * distance / self.width;
-	CGFloat delta = sinf(currentAngle) * self.width - distance;
-
-	attributes.transform3D = CATransform3DConcat(CATransform3DMakeRotation(currentAngle, 0, 1, 0),
-												 CATransform3DMakeTranslation(delta, 0, 0));
-
-	attributes.alpha = (ABS(distance) < self.width);
-
+	CGFloat currentAngle = 1 -ABS(self.maxAngle * distance / self.width);
+    
+    CGFloat scale = currentAngle < 0.7 ? 0.7 : (currentAngle > 1 ? 1 : currentAngle);
+    
+    attributes.transform = CGAffineTransformMakeScale(scale, scale);
+    
 	return attributes;
 }
 
