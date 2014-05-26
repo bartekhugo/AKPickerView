@@ -102,8 +102,8 @@
 {
 	[super layoutSubviews];
 	[self.collectionView.collectionViewLayout invalidateLayout];
-    [self scrollToItem:self.selectedItem animated:YES];
-	self.layer.mask.frame = self.collectionView.bounds;
+    [self scrollToItem:self.selectedItem animated:NO];
+	self.layer.mask.frame = self.bounds;
 }
 
 #pragma mark -
@@ -128,8 +128,7 @@
 	CGFloat offset = 0.0;
 	for (NSInteger i = 0; i < item; i++) {
 		NSIndexPath *_indexPath = [NSIndexPath indexPathForItem:i inSection:0];
-		AKCollectionViewCell *cell = (AKCollectionViewCell *)[self.collectionView cellForItemAtIndexPath:_indexPath];
-		offset += cell.bounds.size.width;
+		offset += [self sizeForItemAtIndexPath:_indexPath].width;
 	}
     
 	NSIndexPath *firstIndexPath = [NSIndexPath indexPathForItem:0 inSection:0];
@@ -155,6 +154,7 @@
 									  animated:animated
 								scrollPosition:UICollectionViewScrollPositionNone];
 	[self scrollToItem:item animated:animated];
+    
     
 	self.selectedItem = item;
     
@@ -211,6 +211,11 @@
 
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout sizeForItemAtIndexPath:(NSIndexPath *)indexPath
 {
+    return [self sizeForItemAtIndexPath:indexPath];
+}
+
+- (CGSize)sizeForItemAtIndexPath:(NSIndexPath *)indexPath
+{
 	NSString *title = [self.delegate pickerView:self titleForItem:indexPath.item];
 	CGSize size;
 	if ([[[UIDevice currentDevice] systemVersion] floatValue] > 7.0) {
@@ -219,6 +224,7 @@
 		size = [title sizeWithFont:self.font];
 	}
 	return CGSizeMake(ceilf(size.width), ceilf(size.height));
+    
 }
 
 - (CGFloat)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewLayout *)collectionViewLayout minimumInteritemSpacingForSectionAtIndex:(NSInteger)section
@@ -320,43 +326,9 @@
 	return self;
 }
 
-- (void)prepareLayout
-{
-	CGRect visibleRect = (CGRect){self.collectionView.contentOffset, self.collectionView.bounds.size};
-	self.midX = CGRectGetMidX(visibleRect);
-	self.width = CGRectGetWidth(visibleRect) / 2;
-	self.maxAngle = M_PI_2;
-}
-
 - (BOOL)shouldInvalidateLayoutForBoundsChange:(CGRect)newBounds
 {
     return YES;
-}
-
-- (UICollectionViewLayoutAttributes *)layoutAttributesForItemAtIndexPath:(NSIndexPath *)indexPath
-{
-	UICollectionViewLayoutAttributes *attributes = [super layoutAttributesForItemAtIndexPath:indexPath];
-    
-	CGFloat distance = CGRectGetMidX(attributes.frame) - self.midX;
-	CGFloat currentAngle = 1 -ABS(self.maxAngle * distance / self.width);
-    
-    CGFloat scale = currentAngle < 0.7 ? 0.7 : (currentAngle > 1 ? 1 : currentAngle);
-    
-    attributes.transform = CGAffineTransformMakeScale(scale, scale);
-    
-	return attributes;
-}
-
-- (NSArray *)layoutAttributesForElementsInRect:(CGRect)rect
-{
-	NSMutableArray *attributes = [NSMutableArray array];
-	if ([self.collectionView numberOfSections]) {
-		for (NSInteger i = 0; i < [self.collectionView numberOfItemsInSection:0]; i++) {
-			NSIndexPath *indexPath = [NSIndexPath indexPathForItem:i inSection:0];
-			[attributes addObject:[self layoutAttributesForItemAtIndexPath:indexPath]];
-		}
-	}
-    return attributes;
 }
 
 @end
